@@ -10,7 +10,7 @@
 #define ThingSpeak 0
 #define IFTTT 1
 #define TUMBLER 2
-
+const int httpPort = 443;
 const char* host = "api.thingspeak.com"; // Your domain  
 const char* host2 ="maker.ifttt.com";
 //const char* host3="ec2-35-174-166-248.compute-1.amazonaws.com";
@@ -20,18 +20,22 @@ String ApiKey = "U87CBNFW57C1V1CC";
 String IFTTTKEY="dCsrRRUCkeIzC2irwNBaGL";
 String EVENTO="nodeMcu_temperature";
 String path = "/update?key=" + ApiKey + "&field1=";  
-String path_pushup="/testing/update?pushup=";
-String path_plank="/testing/update?plank=";
-String path_leg="/testing/update?leg=";
+String path_pushup="/testing/pushup?data=";
+String path_plank="/testing/plank?data=";
+String path_leg="/testing/leg?data=";
+String path_start="/testing/start";
 
 
 
 
-const char* ssid = "SK_WiFiE4EF";
-const char* pass = "1509011593";
+//const char* ssid = "TOZ_SH";
+//const char* pass = "1234567890";
 
-//const char* ssid = "sogang123";
-//const char* pass = "12345678";
+//const char* ssid = "SK_WiFiE4EF";
+//const char* pass = "1509011593";
+
+const char* ssid = "sogang123";
+const char* pass = "12345678";
 
 //////////////////////////////////////////////
 MPU6050 accelgyro;
@@ -53,6 +57,17 @@ int Leg_count=0;
 float Leg_topRange[2]={65,90};
 float Leg_midRange[2]={30,65};
 float Leg_lowRange[2]={-30,30};
+
+//squat movement
+int squat_checkTop=0;
+int squat_checkMiddle=0;
+int squat_checkLow=0;
+int squat_up=0;
+float squat_topRange[2]={60,90};
+float squat_midRange[2]={30,60};
+float squat_lowRange[2]={-10,30};
+int  squat_count=0;
+int  previous_squat_count=0;
 
 // accelerometer values
 int accel_reading;
@@ -93,14 +108,16 @@ int checkTop=0;
 int checkMiddle=0;
 int checkLow=0;
 int down=0;
-float topRange[2]={40,50};
-float midRange[2]={15,40};
+float topRange[2]={35,50};
+float midRange[2]={15,35};
 float lowRange[2]={5,15};
 int  count=0;
 
 
 
-float Range[2]={20,40};
+float Range[2]={14,37};
+unsigned long squat_previousTime = 0;
+unsigned long Leg_previousTime = 0;
 unsigned long previousTime = 0;
 int seconds ;
 int sum=0;
@@ -112,7 +129,7 @@ void setup(void)
 {
   // start serial port
   Wire.begin();
-    Serial.begin(115200);
+    Serial.begin(38400);
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
   Serial.println("Initializing I2C devices...");
@@ -132,8 +149,42 @@ Serial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "M
   Serial.println(ssid);
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
+  WiFiClient client;
+/*
+   if (!client.connect(host, httpPort)) {
+          Serial.println("connection failed");
+          return;
+           }
+                client.print(String("GET ") + path + 15 + " HTTP/1.1\r\n" +
+               "Host: " + host + "\r\n" + 
+               "Connection: keep-alive\r\n\r\n");
 
+
+
+
+*/
+  
+if (!client.connect(host3, httpPort)) {
+     Serial.println("HomeTraining connection failed");
+     return;
+     }
+ client.print(String("GET ") + path_start + " HTTP/1.1\r\n" +
+               "Host: " + host3 + "\r\n" +"User-agent: arduino/1.0\r\n"+ 
+               "Connection: keep-alive\r\n\r\n");
+
+client.print(String("GET /") + " HTTP/1.1\r\n"+ "Host: "+host3+path_start+"\r\n"+ "Connection: keep-alive\r\n"+ "\r\n");
+Serial.print(String("GET /") + " HTTP/1.1\r\n"+ "Host: "+host3+path_start+"\r\n"+ "Connection: keep-alive\r\n"+ "\r\n");
+
+
+               
+                Serial.print(String("GET ") + path_start + " HTTP/1.1\r\n" +
+               "Host: " + host3 + "\r\n" + 
+               "Connection: keep-alive\r\n\r\n");
+
+               
 }
+
+
 
 /*
  * Main function, get and show the temperature
@@ -208,21 +259,63 @@ if(checkMiddle==1 && data<=topRange[1]&& data>=topRange[0]){
 
 
 }
+void squat_downCheck(float data){
+  
+if(data<=squat_topRange[1]&& data>=squat_topRange[0]){
+  squat_checkTop=1;
+}
+if(squat_checkTop==1 && data<=squat_midRange[1] && data >=squat_midRange[0]){
+  squat_checkMiddle=1;
+}
+if(squat_checkMiddle==1 && data<=squat_lowRange[1] && data>=squat_lowRange[0]){
+  squat_checkLow=1;
+}
+
+
+}
+
+void squat_upCheck(float data){
+  
+if(data<=squat_lowRange[1] && data>=squat_lowRange[0]){
+  squat_checkLow=1;
+}
+if(squat_checkLow==1 && data<=squat_midRange[1] && data >=squat_midRange[0]){
+  squat_checkMiddle=1;
+}
+  
+if(squat_checkMiddle==1 && data<=squat_topRange[1]&& data>=squat_topRange[0]){
+  squat_checkTop=1;
+}
+if(squat_checkTop==1 && squat_checkMiddle==1 && squat_checkLow==1)
+{
+  squat_checkTop=0;
+  squat_checkMiddle=0;
+  squat_checkLow=0;
+  squat_up=1;
+}
+
+}
+
 
 float data;
 int i=0;
+ int timepast=0;
+ int  timeflag=0;
+
+ int Leg_timepast=0;
+ int Leg_timeflag=0;
 void loop(void)
 { 
   float duration, distance;
    WiFiClient client;
-  const int httpPort = 80;
+  
   // call sensors.requestTemperatures() to issue a global temperature 
   // request to all devices on the bus
   /*if (!client.connect(host3, httpPort)) {
      Serial.println("HomeTraining connection failed");
      return;
-     }
-     */
+     }*/
+     
 
   digitalWrite(trigPin, HIGH);
   delay(10);   
@@ -230,6 +323,63 @@ void loop(void)
  
   duration = pulseIn(echoPin, HIGH);
   distance = ((float)(340 * duration) / 10000) / 2;
+  ////////////////////////////////////squat///////////////////////////////////////////////
+
+   accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+  // accelerometer_X_Axis angle calc
+  accel_reading = az;
+  accel_corrected = accel_reading - accel_offset;
+  accel_corrected = map(accel_corrected, -16800, 16800, -90, 90);
+  accel_corrected = constrain(accel_corrected, -90, 90);
+  accel_angle = (float)(accel_corrected * accel_scale);
+
+
+data =accel_angle;
+if( squat_up==0){
+   squat_upCheck(data);
+}
+else if( squat_up==1){
+   squat_downCheck(data);
+}
+
+if( squat_up==1 &&  squat_checkLow==1){ 
+  squat_count++;
+    Serial.print(" squat_count:");
+  Serial.println( squat_count);
+   squat_up=0;
+  squat_checkTop=0; 
+  squat_checkMiddle=0;
+  squat_checkLow=0;
+}
+
+/*
+  Serial.print("   squat_checkTop:");
+   Serial.print( squat_checkTop);
+  Serial.print("   squat_checkMiddle:");
+   Serial.print( squat_checkMiddle);
+  Serial.print("   squat_checkLow:");
+   Serial.print( squat_checkLow);
+  Serial.print("   squat_angle:");
+  Serial.print(accel_angle);
+    Serial.print("\t");   Serial.print(" squat_count:");
+  Serial.println( squat_count);
+*/
+
+  if(squat_count==1){
+    timeflag=1;
+  }
+  
+   if (millis() >= (squat_previousTime)  ) {
+squat_previousTime = squat_previousTime + 1000;
+if(timeflag==1)
+timepast+=1;
+
+if(squat_count==1 && timepast>=4){
+  squat_count=0;
+  timepast=0;
+  timeflag=0;
+}
+}
 
 ////////////////////////////////////////////////////plank//////////////////////////////////////////
 if (millis() >= (previousTime)  ) {
@@ -253,12 +403,19 @@ else{
   sum=0;  
    
 }
+/*
 Serial.print(seconds,DEC);
 Serial.print("distance :");
 Serial.print(distance);
-Serial.print("sum :");
-Serial.println(sum);
+*/
+Serial.print("plank time :");
+Serial.print(sum);
+Serial.print(" distance: ");
+  Serial.println(distance);
+
 } // end 1 second
+
+
    ////////////////////////////////////////////////push up///////////////////////////////////////////////////////
 data =distance;
 if(down==0){
@@ -270,7 +427,17 @@ else if(down==1){
 
 if(down==1 && checkTop==1){ 
   count++;
+ Serial.print("pushup count: ");
+  Serial.println(count);
+  
+  if (!client.connect(host3, httpPort)) {
+     Serial.println("HomeTraining connection failed");
+     return;
+     }
    client.print(String("GET ") + path_pushup + count + " HTTP/1.1\r\n" +
+               "Host: " + host3 + "\r\n" + 
+               "Connection: keep-alive\r\n\r\n");
+               Serial.print(String("GET ") + path_pushup + count + " HTTP/1.1\r\n" +
                "Host: " + host3 + "\r\n" + 
                "Connection: keep-alive\r\n\r\n");
   down=0;
@@ -279,8 +446,7 @@ if(down==1 && checkTop==1){
   checkLow=0;
 }
 
-
-dtostrf(data, 2, 2, temperatureString);
+/*
   // After we got the temperatures, we can print them here.
   // We use the function ByIndex, and as an example get the temperature from the first sensor only.
   Serial.print(" pushup_checkTop:");
@@ -290,11 +456,11 @@ dtostrf(data, 2, 2, temperatureString);
   Serial.print("  pushup_checkLow:");
    Serial.print(checkLow);
   Serial.print(" distance: ");
-  Serial.print(temperatureString);
+  Serial.print(data);
   Serial.print("   count: ");
   Serial.println(count);
 
-
+*/
 ////////////////////////////////////////////////////leg_raise/////////////////////////////////
  accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
   // accelerometer_X_Axis angle calc
@@ -316,6 +482,8 @@ else if(up==1){
 
 if(up==1 && Leg_checkLow==1){ 
   Leg_count++;
+   Serial.print("Leg_raise count:");
+  Serial.println(Leg_count);
    client.print(String("GET ") + path_leg + Leg_count + " HTTP/1.1\r\n" +
                "Host: " + host3 + "\r\n" + 
                "Connection: keep-alive\r\n\r\n");
@@ -325,7 +493,7 @@ if(up==1 && Leg_checkLow==1){
   Leg_checkLow=0;
 }
 
-
+/*
   Serial.print(" Leg_checkTop:");
    Serial.print(Leg_checkTop);
   Serial.print("  Leg_checkMiddle:");
@@ -336,6 +504,23 @@ if(up==1 && Leg_checkLow==1){
   Serial.print(accel_angle);
     Serial.print("\t");   Serial.print("count:");
   Serial.println(Leg_count);
+*/
+  if(Leg_count==1){
+    Leg_timeflag=1;
+  }
+  
+   if (millis() >= (Leg_previousTime)  ) {
+Leg_previousTime = Leg_previousTime + 1000;
+if(Leg_timeflag==1)
+Leg_timepast+=1;
+
+if(Leg_count==1 && Leg_timepast>=4){
+  Leg_count=0;
+  Leg_timepast=0;
+  Leg_timeflag=0;
+}
+}
+  
  /*
 if (!client.connect(host3, httpPort)) {
      Serial.println("TUMBLER connection failed");
@@ -371,5 +556,5 @@ if (!client.connect(host3, httpPort)) {
      
   }
   */
-  delay(100);
+
 }
