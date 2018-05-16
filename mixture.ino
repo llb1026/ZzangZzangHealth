@@ -10,20 +10,20 @@
 #define ThingSpeak 0
 #define IFTTT 1
 #define TUMBLER 2
-const int httpPort = 443;
+const int httpPort = 5000;
 const char* host = "api.thingspeak.com"; // Your domain  
 const char* host2 ="maker.ifttt.com";
 //const char* host3="ec2-35-174-166-248.compute-1.amazonaws.com";
-const char* host3="zhuote13t0.execute-api.ap-northeast-2.amazonaws.com";
+const char* host3="106.10.43.32";
 
 String ApiKey = "U87CBNFW57C1V1CC";
 String IFTTTKEY="dCsrRRUCkeIzC2irwNBaGL";
 String EVENTO="nodeMcu_temperature";
 String path = "/update?key=" + ApiKey + "&field1=";  
-String path_pushup="/testing/pushup?data=";
+String path_pushup="/pushup?data=";
 String path_plank="/testing/plank?data=";
 String path_leg="/testing/leg?data=";
-String path_start="/testing/start";
+String path_start="/start";
 
 
 
@@ -434,12 +434,15 @@ if(down==1 && checkTop==1){
      Serial.println("HomeTraining connection failed");
      return;
      }
+     
    client.print(String("GET ") + path_pushup + count + " HTTP/1.1\r\n" +
                "Host: " + host3 + "\r\n" + 
                "Connection: keep-alive\r\n\r\n");
+             /*
                Serial.print(String("GET ") + path_pushup + count + " HTTP/1.1\r\n" +
                "Host: " + host3 + "\r\n" + 
                "Connection: keep-alive\r\n\r\n");
+               */
   down=0;
   checkTop=0; 
   checkMiddle=0;
